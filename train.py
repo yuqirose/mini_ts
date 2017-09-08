@@ -1,3 +1,4 @@
+# %load train.py
 """ Recurrent Neural Network Time Series.
 
 A Recurrent Neural Network (LSTM) multivariate time series forecasting implementation 
@@ -25,15 +26,16 @@ handle 9 sequences for every sample.
 '''
 
 # Training Parameters
-learning_rate = 0.001
+learning_rate = 0.01
 training_steps = 1000
 batch_size = 128
-display_step = 20
+display_step = 200
 
 # Network Parameters
 num_input = 3 # dataset data input (time series dimension: 9)
 timesteps = 10 # timesteps
 num_hidden = 128 # hidden layer num of features
+num_layers = 2 # number of layers
 
 # tf Graph input
 X = tf.placeholder("float", [None, timesteps, num_input])
@@ -58,10 +60,16 @@ def RNN(x,  weights, biases):
     x = tf.unstack(x, timesteps, 1)
 
     # Define a lstm cell with tensorflow
-    lstm_cell = rnn.BasicLSTMCell(num_hidden, forget_bias=1.0)
+    def lstm_cell():
+        return tf.contrib.rnn.BasicLSTMCell(num_hidden,forget_bias=1.0)
+
+
+#     lstm_cell = rnn.BasicLSTMCell(num_hidden, forget_bias=1.0)
+    stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+        [lstm_cell() for _ in range(num_layers)])
 
     # Get lstm cell output
-    outputs, states = rnn.static_rnn(lstm_cell, x, dtype=tf.float32)
+    outputs, states = rnn.static_rnn(stacked_lstm, x, dtype=tf.float32)
  
     # Linear activation, using rnn inner loop last output
     logits = []
@@ -72,12 +80,12 @@ def RNN(x,  weights, biases):
     return logits
 
 logits = RNN(X,  weights, biases)
-prediction = tf.nn.softmax(logits)
+prediction = tf.nn.tanh(logits)
 
 # Define loss and optimizer
 
 loss_op = tf.reduce_mean(tf.squared_difference(prediction, Y))
-optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
 train_op = optimizer.minimize(loss_op)
 
 # Evaluate model (with test logits, for dropout to be disabled)
@@ -107,10 +115,11 @@ with tf.Session() as sess:
 
     print("Optimization Finished!")
 
-    # Calculate accuracy for test inps
-    test_data = dataset.test.inps.reshape((-1, timesteps, num_input))
-    test_label = dataset.test.outs
-
+    # Calculate accuracy for 128 dataset test inps
+    test_len = 128
+    test_data = dataset.test.inps[:test_len].reshape((-1, timesteps, num_input))
+    test_label = dataset.test.outs[:test_len]
+    
     # Fetch the predictions 
     fetches = {
         "true":Y,
