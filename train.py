@@ -32,7 +32,7 @@ batch_size = 128
 display_step = 200
 
 # Network Parameters
-num_input = 3 # dataset data input (time series dimension: 9)
+num_input = 3 # dataset data input (time series dimension: 3)
 timesteps = 10 # timesteps
 num_hidden = 128 # hidden layer num of features
 num_layers = 2 # number of layers
@@ -71,7 +71,7 @@ def RNN(x,  weights, biases):
     # Get lstm cell output
     outputs, states = rnn.static_rnn(stacked_lstm, x, dtype=tf.float32)
  
-    # Linear activation, using rnn inner loop last output
+    # Concatenate all hidden states
     logits = []
     for output in outputs:
         logit = tf.matmul(output, weights['out']) + biases['out']
@@ -80,17 +80,13 @@ def RNN(x,  weights, biases):
     return logits
 
 logits = RNN(X,  weights, biases)
+# Using tanh activation function
 prediction = tf.nn.tanh(logits)
 
 # Define loss and optimizer
-
 loss_op = tf.reduce_mean(tf.squared_difference(prediction, Y))
 optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
 train_op = optimizer.minimize(loss_op)
-
-# Evaluate model (with test logits, for dropout to be disabled)
-correct_pred = tf.equal(tf.argmax(prediction, 1), tf.argmax(Y, 1))
-accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
 # Initialize the variables (i.e. assign their default value)
 init = tf.global_variables_initializer()
@@ -106,12 +102,10 @@ with tf.Session() as sess:
         # Run optimization op (backprop)
         sess.run(train_op, feed_dict={X: batch_x, Y: batch_y})
         if step % display_step == 0 or step == 1:
-            # Calculate batch loss and accuracy
-            loss, acc = sess.run([loss_op, accuracy], feed_dict={X: batch_x,
-                                                                 Y: batch_y})
+            # Calculate batch loss 
+            loss = sess.run(loss_op, feed_dict={X: batch_x,Y: batch_y})
             print("Step " + str(step) + ", Minibatch Loss= " + \
-                  "{:.4f}".format(loss) + ", Training Accuracy= " + \
-                  "{:.3f}".format(acc))
+                  "{:.4f}".format(loss) )
 
     print("Optimization Finished!")
 
@@ -124,7 +118,7 @@ with tf.Session() as sess:
     fetches = {
         "true":Y,
         "pred":prediction,
-        "accuracy":accuracy
+        "loss":loss_op
     }
     vals = sess.run(fetches, feed_dict={X: test_data, Y: test_label})
-    print("Testing Accuracy:", vals["accuracy"])
+    print("Testing Loss:", vals["loss"])
