@@ -1,6 +1,6 @@
 # mini_ts
 
-Minialist time series forecasting with Tensorflow
+Minimalist time series forecasting with Tensorflow
 
 - Multivariate time series
 - Simple example with sin wave
